@@ -20,8 +20,10 @@
 
 #include <limits.h>
 
+#include <GL/gl.h>
+
 #include "Backend.h"
-#include "Expr.h"
+#include "IR.h"
 
 namespace {
 
@@ -211,8 +213,9 @@ private:
   QJsonObject mRoot;
 };
 
-class BackendObject final
+class BackendObject final : public QObject
 {
+  Q_OBJECT
 public:
   BackendObject(std::unique_ptr<Backend> backend)
     : mBackend(std::move(backend))
@@ -242,28 +245,33 @@ public:
 
     mBackend->ComputeHeightMap();
 
-    Display();
+    emit HeightMapChanged();
   }
+
+  // clang-format off
+signals:
+  // clang-format on
+  void HeightMapChanged();
 
 private:
   std::unique_ptr<Backend> mBackend;
 };
 
-class DisplayModelView : public QOpenGLWidget
+class RenderWidget : public QOpenGLWidget
 {
 public:
-  DisplayModelView(std::shared_ptr<BackendObject> backendObject)
+  RenderWidget(std::shared_ptr<BackendObject> backendObject)
     : mBackendObject(backendObject)
   {
     setMinimumSize(320, 240);
   }
 
 protected:
-  void paintGL() override {}
+  void paintGL() override { mBackendObject->Display(); }
 
-  void resizeGL(int, int) override {}
+  void resizeGL(int w, int h) override { glViewport(0, 0, w, h); }
 
-  void initializeGL() override {}
+  void initializeGL() override { glClearColor(0.0f, 0.0f, 0.0f, 1.0f); }
 
 private:
   std::shared_ptr<BackendObject> mBackendObject;
@@ -285,6 +293,7 @@ private:
 
 class Workspace : public QSplitter
 {
+  Q_OBJECT
 public:
   Workspace(std::shared_ptr<BackendObject> backendObject, QWidget* parent)
     : QSplitter(Qt::Horizontal, parent)
@@ -304,11 +313,11 @@ public:
 
     mFlowView = new QtNodes::FlowView(mFlowScene);
 
-    mDisplayModelView = new DisplayModelView(backendObject);
+    mRenderWidget = new RenderWidget(backendObject);
 
     addWidget(mFlowView);
 
-    addWidget(mDisplayModelView);
+    addWidget(mRenderWidget);
 
     setSizes(QList<int>({ INT_MAX, INT_MAX }));
   }
@@ -318,12 +327,15 @@ public:
     mBackendObject->OpenProject(project);
   }
 
+public slots:
+  void QueueRender() { mRenderWidget->update(); }
+
 private:
   QtNodes::FlowScene* mFlowScene = nullptr;
 
   QtNodes::FlowView* mFlowView = nullptr;
 
-  DisplayModelView* mDisplayModelView = nullptr;
+  RenderWidget* mRenderWidget = nullptr;
 
   std::shared_ptr<BackendObject> mBackendObject;
 };
@@ -364,6 +376,11 @@ main(int argc, char** argv)
 
   workspace.OpenProject(project);
 
+  QObject::connect(backendObject.get(),
+                   &BackendObject::HeightMapChanged,
+                   &workspace,
+                   &Workspace::QueueRender);
+
   return app.exec();
 }
 
@@ -381,3 +398,5 @@ VertexOutputModel::UpdateVertexOutput(const QtNodes::NodeData& nodeData)
 }
 
 } // namespace
+
+#include "main.moc"

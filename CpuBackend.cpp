@@ -1,10 +1,45 @@
 #include "CpuBackend.h"
 
-#include "Expr.h"
+#include "IR.h"
+#include "OpenGL.h"
 
-#include <vector>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <fstream>
+#include <iostream>
+#include <vector>
+
+#include <stdint.h>
+
+const char* gVertShaderSource = R"(
+#version 110
+
+attribute vec3 position;
+
+varying vec2 tex_coord;
+
+uniform mat4 mvp;
+
+void
+main()
+{
+    gl_Position = mvp * vec4(position, 1.0);
+
+    tex_coord = (position.xy + 1.0) * 0.5;
+}
+)";
+
+const char* gFragShaderSource = R"(
+#version 110
+
+varying vec2 tex_coord;
+
+void
+main()
+{
+    gl_FragColor = vec4(tex_coord, 1.0, 1.0);
+}
+)";
 
 namespace {
 
@@ -64,9 +99,190 @@ private:
   std::unique_ptr<FloatExpr> mFloatExpr;
 };
 
+class GlContext final
+{
+public:
+  GlContext()
+    : mProgram(CreateShaderProgram())
+  {
+    glGenBuffers(1, &mVertexBufferID);
+
+    glGenBuffers(1, &mIndexBufferID);
+
+    mMvpLocation = glGetUniformLocation(mProgram.ID(), "mvp");
+  }
+
+  void UpdateBufferData(const std::vector<float>& height, size_t w, size_t h)
+  {
+    UpdateVertexBuffer(height, w, h);
+
+    UpdateIndexBuffer(w, h);
+  }
+
+  void Render(size_t w, size_t h)
+  {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glBindBuffer(GL_ARRAY_BUFFER, mVertexBufferID);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexBufferID);
+
+    glUseProgram(mProgram.ID());
+
+    if (mMvpLocation != -1) {
+
+      float aspect = float(w) / h;
+
+      float t_near = 0.001;
+
+      float t_far = 100;
+
+      auto proj = glm::perspective(glm::radians(45.0f), aspect, t_near, t_far);
+
+      auto eye = glm::vec3(3, 3, 3);
+      auto center = glm::vec3(0, 0, 0);
+      auto up = glm::vec3(0, 1, 0);
+      auto view = glm::lookAt(eye, center, up);
+
+      auto model = glm::mat4(1.0f);
+
+      auto mvp = proj * view * model;
+
+      glUniformMatrix4fv(mMvpLocation, 1, GL_FALSE, &mvp[0][0]);
+    }
+
+    glDrawElements(GL_TRIANGLES, (w - 1) * (h - 1) * 6, GL_UNSIGNED_INT, 0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+  }
+
+private:
+  void UpdateVertexBuffer(const std::vector<float>& height, size_t w, size_t h)
+  {
+    mVertexBuffer.resize(w * h * 3);
+
+    for (size_t i = 0; i < (w * h); i++) {
+
+      size_t x = i % w;
+      size_t y = i / w;
+
+      mVertexBuffer[(i * 3) + 0] = (((x + 0.5f) / w) * 2.0f) - 1.0f;
+      mVertexBuffer[(i * 3) + 1] = height[i];
+      mVertexBuffer[(i * 3) + 2] = (((y + 0.5f) / h) * 2.0f) - 1.0f;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, mVertexBufferID);
+
+    auto posAttribLoc = glGetAttribLocation(mProgram.ID(), "position");
+
+    glEnableVertexAttribArray(posAttribLoc);
+
+    glVertexAttribPointer(
+      posAttribLoc, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+
+    glBufferData(GL_ARRAY_BUFFER,
+                 mVertexBuffer.size() * sizeof(mVertexBuffer[0]),
+                 mVertexBuffer.data(),
+                 GL_DYNAMIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+  }
+
+  void UpdateIndexBuffer(size_t w, size_t h)
+  {
+    InitializeIndexBuffer(w, h);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexBufferID);
+
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                 mIndexBuffer.size() * sizeof(mIndexBuffer[0]),
+                 mIndexBuffer.data(),
+                 GL_DYNAMIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+  }
+
+  void InitializeIndexBuffer(size_t w, size_t h)
+  {
+    size_t bufW = w - 1;
+    size_t bufH = h - 1;
+
+    mIndexBuffer.resize(bufW * bufH * 6);
+
+    auto toVertIndex = [w](size_t x, size_t y) { return (y * w) + x; };
+
+    auto* ptr = mIndexBuffer.data();
+
+    for (size_t i = 0; i < (bufW * bufH); i++) {
+
+      size_t x = i % bufW;
+      size_t y = i / bufW;
+
+      ptr[0] = toVertIndex(x, y);
+      ptr[1] = toVertIndex(x, y + 1);
+      ptr[2] = toVertIndex(x + 1, y);
+
+      ptr[3] = toVertIndex(x, y + 1);
+      ptr[4] = toVertIndex(x + 1, y + 1);
+      ptr[5] = toVertIndex(x + 1, y);
+
+      ptr += 6;
+    }
+  }
+
+  static auto CreateShaderProgram() -> GlProgram
+  {
+    auto vertShader = GlShader::Create(GL_VERTEX_SHADER, gVertShaderSource);
+
+    std::pair<bool, std::string> compResult = vertShader.GetCompileResult();
+
+    if (!compResult.first) {
+      std::cerr << "vertex shader: " << compResult.second << std::endl;
+      return GlProgram::MakeInvalid();
+    }
+
+    auto fragShader = GlShader::Create(GL_FRAGMENT_SHADER, gFragShaderSource);
+
+    compResult = fragShader.GetCompileResult();
+
+    if (!compResult.first) {
+      std::cerr << "fragment shader: " << compResult.second << std::endl;
+      return GlProgram::MakeInvalid();
+    }
+
+    auto prg = GlProgram::Create({ vertShader.ID(), fragShader.ID() });
+
+    auto linkResult = prg.GetLinkResult();
+
+    if (linkResult.first)
+      return prg;
+
+    std::cerr << linkResult.second << std::endl;
+
+    return prg;
+  }
+
+private:
+  std::vector<float> mVertexBuffer;
+
+  std::vector<uint32_t> mIndexBuffer;
+
+  GLuint mVertexBufferID = 0;
+
+  GLuint mIndexBufferID = 0;
+
+  GlProgram mProgram = GlProgram::MakeInvalid();
+
+  GLint mMvpLocation = 0;
+};
+
 class CpuBackendImpl final : public CpuBackend
 {
 public:
+  CpuBackendImpl() {}
+
   void ComputeHeightMap() override
   {
     BuiltinVars builtinVars;
@@ -85,25 +301,12 @@ public:
 
   void Display() override
   {
-    std::ofstream file("image.ppm");
-    file << "P6" << std::endl;
-    file << mWidth << ' ' << mHeight << std::endl;
-    file << "255" << std::endl;
+    if (!mGlContext)
+      mGlContext.reset(new GlContext());
 
-    using uchar = unsigned char;
+    mGlContext->UpdateBufferData(mHeightMap, mWidth, mHeight);
 
-    std::vector<uchar> c(mWidth * mHeight * 3);
-
-    for (size_t i = 0; i < (mWidth * mHeight); i++) {
-
-      auto v = uchar(255 * mHeightMap[i]);
-
-      c[(i * 3) + 0] = v;
-      c[(i * 3) + 1] = v;
-      c[(i * 3) + 2] = v;
-    }
-
-    file.write((const char*)c.data(), c.size());
+    mGlContext->Render(mWidth, mHeight);
   }
 
   void Resize(size_t w, size_t h) override
@@ -132,6 +335,8 @@ public:
   }
 
 private:
+  std::unique_ptr<GlContext> mGlContext;
+
   std::unique_ptr<FloatExpr> mHeightMapExpr;
 
   std::vector<float> mHeightMap;
