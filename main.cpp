@@ -3,7 +3,9 @@
 #include <QMainWindow>
 #include <QOpenGLWidget>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QSplitter>
+#include <QTimer>
 #include <QToolBar>
 #include <QWidget>
 
@@ -31,6 +33,20 @@ class BackendObject;
 
 using UniqueExprPtr = std::unique_ptr<ir::Expr>;
 
+using SharedNodeDataPtr = std::shared_ptr<QtNodes::NodeData>;
+
+QtNodes::NodeDataType
+ToNodeDataType(ir::Type type, const char* name = "")
+{
+  switch (type) {
+    case ir::Type::Int:
+      return QtNodes::NodeDataType{ "int", name };
+    case ir::Type::Float:
+      return QtNodes::NodeDataType{ "float", name };
+  }
+  return QtNodes::NodeDataType{ "", "" };
+}
+
 class ExprNodeData final : public QtNodes::NodeData
 {
 public:
@@ -44,27 +60,20 @@ public:
 
     if (!exprType)
       return QtNodes::NodeDataType{ "", "" };
-
-    switch (*exprType) {
-      case ir::Type::Float:
-        return QtNodes::NodeDataType{ "float", "" };
-    }
-
-    return QtNodes::NodeDataType{ "", "" };
+    else
+      return ToNodeDataType(*exprType);
   }
 
-  const ir::Expr& GetExpr() const noexcept { return *mExpr; }
+  const ir::Expr* GetExpr() const noexcept { return mExpr.get(); }
 
 private:
   UniqueExprPtr mExpr;
 };
 
 auto
-MakeNodeData(ir::Expr* expr) -> std::shared_ptr<QtNodes::NodeData>
+MakeNodeData(ir::Expr* expr) -> SharedNodeDataPtr
 {
-  using RetType = std::shared_ptr<QtNodes::NodeData>;
-
-  return RetType(new ExprNodeData(UniqueExprPtr(expr)));
+  return SharedNodeDataPtr(new ExprNodeData(UniqueExprPtr(expr)));
 }
 
 class CoordinatesModel : public QtNodes::NodeDataModel
@@ -96,9 +105,9 @@ public:
   {
     switch (portIndex) {
       case 0:
-        return QtNodes::NodeDataType{ "float", "center u" };
+        return QtNodes::NodeDataType{ "float", "Center U" };
       case 1:
-        return QtNodes::NodeDataType{ "float", "center v" };
+        return QtNodes::NodeDataType{ "float", "Center V" };
     }
     return QtNodes::NodeDataType{ "", "" };
   }
@@ -125,10 +134,6 @@ public:
 class VertexOutputModel : public QtNodes::NodeDataModel
 {
 public:
-  VertexOutputModel(std::shared_ptr<BackendObject> backendObject)
-    : mBackendObject(backendObject)
-  {}
-
   QString caption() const override { return QStringLiteral("Vertex Output"); }
 
   QString name() const override { return QStringLiteral("Vertex Output"); }
@@ -155,7 +160,7 @@ public:
   {
     switch (portIndex) {
       case 0:
-        return QtNodes::NodeDataType{ "float", "height" };
+        return QtNodes::NodeDataType{ "float", "Height" };
     }
     return QtNodes::NodeDataType{ "", "" };
   }
@@ -171,17 +176,98 @@ public:
   {
     switch (portIndex) {
       case 0:
-        UpdateVertexOutput(*nodeData);
+        mNodeData = nodeData;
         break;
     }
   }
 
   QWidget* embeddedWidget() override { return nullptr; }
 
-private:
-  void UpdateVertexOutput(const QtNodes::NodeData& nodeData);
+  auto ToIRExpr() -> const ir::Expr*
+  {
+    if (!mNodeData)
+      return nullptr;
 
+    const auto* derived = dynamic_cast<const ExprNodeData*>(mNodeData.get());
+    if (!derived)
+      return nullptr;
+
+    return derived->GetExpr();
+  }
+
+private:
+  SharedNodeDataPtr mNodeData;
+};
+
+class LiteralModel : public QtNodes::NodeDataModel
+{
+public:
+  virtual const char* GetName() const noexcept = 0;
+
+  QString caption() const override { return GetName(); }
+
+  QString name() const override { return GetName(); }
+
+  QJsonObject save() const override { return QJsonObject(); }
+
+  void restore(const QJsonObject&) override {}
+
+  unsigned int nPorts(QtNodes::PortType portType) const override
+  {
+    switch (portType) {
+      case QtNodes::PortType::None:
+      case QtNodes::PortType::In:
+        break;
+      case QtNodes::PortType::Out:
+        return 1;
+    }
+
+    return 0;
+  }
+
+  void setInData(std::shared_ptr<QtNodes::NodeData>,
+                 QtNodes::PortIndex) override
+  {}
+
+  QWidget* embeddedWidget() override { return GetSpinBox(); }
+
+  virtual QAbstractSpinBox* GetSpinBox() = 0;
+
+private:
   std::shared_ptr<BackendObject> mBackendObject;
+};
+
+class FloatLiteralModel final : public LiteralModel
+{
+  Q_OBJECT
+public:
+  FloatLiteralModel()
+  {
+    connect(&mSpinBox,
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            [this](double) { OnDataChange(); });
+  }
+
+  const char* GetName() const noexcept { return "Float Constant"; }
+
+  QAbstractSpinBox* GetSpinBox() override { return &mSpinBox; }
+
+  auto outData(QtNodes::PortIndex) -> SharedNodeDataPtr override
+  {
+    return MakeNodeData(new ir::LiteralExpr<float>(mSpinBox.value()));
+  }
+
+  auto dataType(QtNodes::PortType, QtNodes::PortIndex) const
+    -> QtNodes::NodeDataType override
+  {
+    return QtNodes::NodeDataType{ "float", "Value" };
+  }
+
+protected slots:
+  void OnDataChange() { emit dataUpdated(0); }
+
+private:
+  QDoubleSpinBox mSpinBox;
 };
 
 class Project
@@ -233,7 +319,12 @@ public:
     mBackend->Resize(size_t(w), size_t(h));
   }
 
-  void Display() { mBackend->Display(); }
+  void Render()
+  {
+    mBackend->ComputeHeightMap();
+
+    mBackend->Display();
+  }
 
   void UpdateHeightMapExpr(const ir::Expr& expr)
   {
@@ -242,16 +333,7 @@ public:
     if (!success) {
       // TODO : log error
     }
-
-    mBackend->ComputeHeightMap();
-
-    emit HeightMapChanged();
   }
-
-  // clang-format off
-signals:
-  // clang-format on
-  void HeightMapChanged();
 
 private:
   std::unique_ptr<Backend> mBackend;
@@ -260,14 +342,30 @@ private:
 class RenderWidget : public QOpenGLWidget
 {
 public:
-  RenderWidget(std::shared_ptr<BackendObject> backendObject)
+  RenderWidget(std::shared_ptr<BackendObject> backendObject,
+               VertexOutputModel* vertexOutputModel)
     : mBackendObject(backendObject)
+    , mVertexOutputModel(vertexOutputModel)
+    , mTimer(new QTimer(this))
   {
     setMinimumSize(320, 240);
+
+    connect(mTimer, &QTimer::timeout, [this]() { update(); });
+
+    mTimer->start(1000 / 24);
   }
 
 protected:
-  void paintGL() override { mBackendObject->Display(); }
+  void paintGL() override
+  {
+    const auto* irExpr = mVertexOutputModel->ToIRExpr();
+
+    if (irExpr) {
+      mBackendObject->UpdateHeightMapExpr(*irExpr);
+    }
+
+    mBackendObject->Render();
+  }
 
   void resizeGL(int w, int h) override { glViewport(0, 0, w, h); }
 
@@ -275,6 +373,10 @@ protected:
 
 private:
   std::shared_ptr<BackendObject> mBackendObject;
+
+  VertexOutputModel* mVertexOutputModel = nullptr;
+
+  QTimer* mTimer = nullptr;
 };
 
 class ToolBar : public QToolBar
@@ -303,17 +405,20 @@ public:
       new QtNodes::DataModelRegistry());
 
     dataModels->registerModel<CoordinatesModel>("Inputs");
-
-    // dataModels->registerModel<VertexOutputModel>("Outputs");
+    // dataModels->registerModel<LiteralModel<int>>("Inputs");
+    dataModels->registerModel<FloatLiteralModel>("Inputs");
 
     mFlowScene = new QtNodes::FlowScene(dataModels, this);
 
-    mFlowScene->createNode(std::unique_ptr<QtNodes::NodeDataModel>(
-      new VertexOutputModel(backendObject)));
+    auto vertexOutputModel = std::make_unique<VertexOutputModel>();
+
+    mVertexOutputModel = vertexOutputModel.get();
+
+    mFlowScene->createNode(std::move(vertexOutputModel));
 
     mFlowView = new QtNodes::FlowView(mFlowScene);
 
-    mRenderWidget = new RenderWidget(backendObject);
+    mRenderWidget = new RenderWidget(backendObject, mVertexOutputModel);
 
     addWidget(mFlowView);
 
@@ -327,15 +432,14 @@ public:
     mBackendObject->OpenProject(project);
   }
 
-public slots:
-  void QueueRender() { mRenderWidget->update(); }
-
 private:
   QtNodes::FlowScene* mFlowScene = nullptr;
 
   QtNodes::FlowView* mFlowView = nullptr;
 
   RenderWidget* mRenderWidget = nullptr;
+
+  VertexOutputModel* mVertexOutputModel = nullptr;
 
   std::shared_ptr<BackendObject> mBackendObject;
 };
@@ -376,27 +480,7 @@ main(int argc, char** argv)
 
   workspace.OpenProject(project);
 
-  QObject::connect(backendObject.get(),
-                   &BackendObject::HeightMapChanged,
-                   &workspace,
-                   &Workspace::QueueRender);
-
   return app.exec();
 }
-
-namespace {
-
-void
-VertexOutputModel::UpdateVertexOutput(const QtNodes::NodeData& nodeData)
-{
-  auto* exprNodeData = dynamic_cast<const ExprNodeData*>(&nodeData);
-
-  if (!exprNodeData)
-    return;
-
-  mBackendObject->UpdateHeightMapExpr(exprNodeData->GetExpr());
-}
-
-} // namespace
 
 #include "main.moc"

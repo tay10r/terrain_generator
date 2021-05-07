@@ -57,6 +57,19 @@ public:
   virtual float Eval(const BuiltinVars&) const noexcept = 0;
 };
 
+class FloatLiteral final : public FloatExpr
+{
+public:
+  FloatLiteral(float value)
+    : mValue(value)
+  {}
+
+  float Eval(const BuiltinVars&) const noexcept override { return mValue; }
+
+private:
+  float mValue;
+};
+
 class UCoordExpr final : public FloatExpr
 {
 public:
@@ -94,6 +107,13 @@ public:
         break;
     }
   }
+
+  void Visit(const ir::FloatLiteralExpr& floatLiteralExpr) override
+  {
+    mFloatExpr.reset(new FloatLiteral(floatLiteralExpr.GetValue()));
+  }
+
+  void Visit(const ir::IntLiteralExpr&) override {}
 
 private:
   std::unique_ptr<FloatExpr> mFloatExpr;
@@ -285,6 +305,9 @@ public:
 
   void ComputeHeightMap() override
   {
+    if (!mHeightMapExpr)
+      mHeightMapExpr.reset(new FloatLiteral(0.0));
+
     BuiltinVars builtinVars;
 
     for (size_t i = 0; i < (mWidth * mHeight); i++) {
