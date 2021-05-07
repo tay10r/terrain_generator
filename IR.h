@@ -34,8 +34,8 @@ class VarRefExpr final : public Expr
 public:
   enum class ID
   {
-    XCoord,
-    YCoord
+    CenterUCoord,
+    CenterVCoord
   };
 
   VarRefExpr(ID id) noexcept;

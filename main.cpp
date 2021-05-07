@@ -96,9 +96,9 @@ public:
   {
     switch (portIndex) {
       case 0:
-        return QtNodes::NodeDataType{ "float", "x" };
+        return QtNodes::NodeDataType{ "float", "center u" };
       case 1:
-        return QtNodes::NodeDataType{ "float", "y" };
+        return QtNodes::NodeDataType{ "float", "center v" };
     }
     return QtNodes::NodeDataType{ "", "" };
   }
@@ -108,9 +108,11 @@ public:
   {
     switch (portIndex) {
       case 0:
-        return MakeNodeData(new ir::VarRefExpr(ir::VarRefExpr::ID::XCoord));
+        return MakeNodeData(
+          new ir::VarRefExpr(ir::VarRefExpr::ID::CenterUCoord));
       case 1:
-        return MakeNodeData(new ir::VarRefExpr(ir::VarRefExpr::ID::YCoord));
+        return MakeNodeData(
+          new ir::VarRefExpr(ir::VarRefExpr::ID::CenterVCoord));
     }
     return nullptr;
   }
@@ -167,8 +169,6 @@ public:
   void setInData(std::shared_ptr<QtNodes::NodeData> nodeData,
                  QtNodes::PortIndex portIndex) override
   {
-    std::cout << "set in" << std::endl;
-
     switch (portIndex) {
       case 0:
         UpdateVertexOutput(*nodeData);

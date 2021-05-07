@@ -18,10 +18,7 @@ FetchContent_Declare(glm
 
 FetchContent_MakeAvailable(glm)
 
-set(CMAKE_AUTOMOC ON)
-
-add_executable(mapgen
-  main.cpp
+add_library(mapgen
   Backend.h
   Backend.cpp
   CpuBackend.h
@@ -29,10 +26,30 @@ add_executable(mapgen
   IR.h
   IR.cpp)
 
-target_compile_features(mapgen PRIVATE cxx_std_17)
+target_include_directories(mapgen PUBLIC "${PROJECT_SOURCE_DIR}")
+
+target_compile_features(mapgen PUBLIC cxx_std_17)
+
+target_link_libraries(mapgen PUBLIC glm OpenGL::OpenGL)
+
+set(CMAKE_AUTOMOC ON)
+
+add_executable(mapgen_gui main.cpp)
+
+set_target_properties(mapgen_gui
+  PROPERTIES
+    OUTPUT_NAME mapgen)
+
+target_link_libraries(mapgen_gui PRIVATE Qt5::Widgets NodeEditor::nodes mapgen)
 
 if(NOT MSVC)
+
   target_compile_options(mapgen PRIVATE -Wall -Wextra -Werror -Wfatal-errors)
+
+  target_compile_options(mapgen_gui PRIVATE -Wall -Wextra -Werror -Wfatal-errors)
+
 endif(NOT MSVC)
 
-target_link_libraries(mapgen PRIVATE Qt5::Widgets NodeEditor::nodes glm OpenGL::OpenGL)
+add_subdirectory(tests)
+
+enable_testing()

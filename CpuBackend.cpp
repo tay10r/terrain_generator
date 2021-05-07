@@ -86,10 +86,10 @@ public:
   void Visit(const ir::VarRefExpr& varRefExpr) override
   {
     switch (varRefExpr.GetID()) {
-      case ir::VarRefExpr::ID::XCoord:
+      case ir::VarRefExpr::ID::CenterUCoord:
         mFloatExpr.reset(new UCoordExpr());
         break;
-      case ir::VarRefExpr::ID::YCoord:
+      case ir::VarRefExpr::ID::CenterVCoord:
         mFloatExpr.reset(new VCoordExpr());
         break;
     }
@@ -332,6 +332,12 @@ public:
     mHeightMapExpr = std::move(result);
 
     return true;
+  }
+
+  void ReadHeightMap(float* buf) const override
+  {
+    for (size_t i = 0; i < mHeightMap.size(); i++)
+      buf[i] = mHeightMap[i];
   }
 
 private:

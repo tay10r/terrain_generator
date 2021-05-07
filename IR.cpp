@@ -22,8 +22,8 @@ auto
 VarRefExpr::GetType() const noexcept -> std::optional<Type>
 {
   switch (mID) {
-    case ID::XCoord:
-    case ID::YCoord:
+    case ID::CenterUCoord:
+    case ID::CenterVCoord:
       return Type::Float;
   }
 
