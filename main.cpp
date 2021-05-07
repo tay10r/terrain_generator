@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QDoubleSpinBox>
 #include <QHBoxLayout>
 #include <QMainWindow>
 #include <QOpenGLWidget>
@@ -242,19 +243,20 @@ class FloatLiteralModel final : public LiteralModel
   Q_OBJECT
 public:
   FloatLiteralModel()
+    : mSpinBox(new QDoubleSpinBox())
   {
-    connect(&mSpinBox,
+    connect(mSpinBox,
             QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             [this](double) { OnDataChange(); });
   }
 
   const char* GetName() const noexcept { return "Float Constant"; }
 
-  QAbstractSpinBox* GetSpinBox() override { return &mSpinBox; }
+  QAbstractSpinBox* GetSpinBox() override { return mSpinBox; }
 
   auto outData(QtNodes::PortIndex) -> SharedNodeDataPtr override
   {
-    return MakeNodeData(new ir::LiteralExpr<float>(mSpinBox.value()));
+    return MakeNodeData(new ir::LiteralExpr<float>(mSpinBox->value()));
   }
 
   auto dataType(QtNodes::PortType, QtNodes::PortIndex) const
@@ -267,7 +269,41 @@ protected slots:
   void OnDataChange() { emit dataUpdated(0); }
 
 private:
-  QDoubleSpinBox mSpinBox;
+  QDoubleSpinBox* mSpinBox;
+};
+
+class IntLiteralModel final : public LiteralModel
+{
+  Q_OBJECT
+public:
+  IntLiteralModel()
+    : mSpinBox(new QSpinBox())
+  {
+    connect(mSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), [this](int) {
+      OnDataChange();
+    });
+  }
+
+  const char* GetName() const noexcept { return "Integer Constant"; }
+
+  QAbstractSpinBox* GetSpinBox() override { return mSpinBox; }
+
+  auto outData(QtNodes::PortIndex) -> SharedNodeDataPtr override
+  {
+    return MakeNodeData(new ir::LiteralExpr<int>(mSpinBox->value()));
+  }
+
+  auto dataType(QtNodes::PortType, QtNodes::PortIndex) const
+    -> QtNodes::NodeDataType override
+  {
+    return QtNodes::NodeDataType{ "int", "Value" };
+  }
+
+protected slots:
+  void OnDataChange() { emit dataUpdated(0); }
+
+private:
+  QSpinBox* mSpinBox;
 };
 
 class Project
@@ -405,7 +441,7 @@ public:
       new QtNodes::DataModelRegistry());
 
     dataModels->registerModel<CoordinatesModel>("Inputs");
-    // dataModels->registerModel<LiteralModel<int>>("Inputs");
+    dataModels->registerModel<IntLiteralModel>("Inputs");
     dataModels->registerModel<FloatLiteralModel>("Inputs");
 
     mFlowScene = new QtNodes::FlowScene(dataModels, this);
