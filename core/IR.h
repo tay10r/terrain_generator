@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -8,10 +9,18 @@ namespace ir {
 enum class Type
 {
   Float,
-  Int
+  Int,
+  Vec2,
+  Vec3,
+  Vec4,
+  Mat2,
+  Mat3,
+  Mat4
 };
 
 class VarRefExpr;
+class IntToFloatExpr;
+class FloatToIntExpr;
 
 template<typename ValueType>
 class LiteralExpr;
@@ -30,6 +39,10 @@ public:
   virtual void Visit(const IntLiteralExpr&) = 0;
 
   virtual void Visit(const FloatLiteralExpr&) = 0;
+
+  virtual void Visit(const FloatToIntExpr&) = 0;
+
+  virtual void Visit(const IntToFloatExpr&) = 0;
 };
 
 class Expr
@@ -57,7 +70,7 @@ public:
 
   auto GetID() const noexcept -> ID;
 
-  auto GetType() const noexcept -> std::optional<Type>;
+  auto GetType() const noexcept -> std::optional<Type> override;
 
 private:
   ID mID;
@@ -98,6 +111,37 @@ public:
 
 private:
   ValueType mValue;
+};
+
+class CastExpr : public Expr
+{
+public:
+  CastExpr(std::unique_ptr<Expr>&& sourceExpr);
+
+  const Expr& GetSourceExpr() const noexcept;
+
+private:
+  std::unique_ptr<Expr> mSourceExpr;
+};
+
+class IntToFloatExpr final : public CastExpr
+{
+public:
+  using CastExpr::CastExpr;
+
+  void Accept(ExprVisitor& visitor) const override;
+
+  auto GetType() const noexcept -> std::optional<Type> override;
+};
+
+class FloatToIntExpr final : public CastExpr
+{
+public:
+  using CastExpr::CastExpr;
+
+  void Accept(ExprVisitor& visitor) const override;
+
+  auto GetType() const noexcept -> std::optional<Type> override;
 };
 
 } // namespace ir

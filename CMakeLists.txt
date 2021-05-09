@@ -9,7 +9,7 @@ find_package(OpenGL REQUIRED COMPONENTS OpenGL)
 include(FetchContent)
 
 FetchContent_Declare(nodeeditor
-  URL "https://github.com/paceholder/nodeeditor/archive/master.zip")
+  URL "https://github.com/tay10r/nodeeditor/archive/master.zip")
 
 FetchContent_MakeAvailable(nodeeditor)
 
@@ -19,12 +19,14 @@ FetchContent_Declare(glm
 FetchContent_MakeAvailable(glm)
 
 add_library(mapgen
-  Backend.h
-  Backend.cpp
-  CpuBackend.h
-  CpuBackend.cpp
-  IR.h
-  IR.cpp)
+  core/Backend.h
+  core/Backend.cpp
+  core/Camera.h
+  core/Camera.cpp
+  core/CpuBackend.h
+  core/CpuBackend.cpp
+  core/IR.h
+  core/IR.cpp)
 
 target_include_directories(mapgen PUBLIC "${PROJECT_SOURCE_DIR}")
 
@@ -32,13 +34,31 @@ target_compile_features(mapgen PUBLIC cxx_std_17)
 
 target_link_libraries(mapgen PUBLIC glm OpenGL::OpenGL)
 
-set(CMAKE_AUTOMOC ON)
-
-add_executable(mapgen_gui main.cpp)
+add_executable(mapgen_gui
+  main.cpp
+  gui/BackendUpdater.h
+  gui/BackendUpdater.cpp
+  gui/CoordinatesModel.h
+  gui/CoordinatesModel.cpp
+  gui/ConstantsModels.h
+  gui/ConstantsModels.cpp
+  gui/ExprNodeData.h
+  gui/ExprNodeData.cpp
+  gui/Editor.h
+  gui/Editor.cpp
+  gui/MenuBar.h
+  gui/MenuBar.cpp
+  gui/OutputModels.h
+  gui/OutputModels.cpp
+  gui/SceneView.h
+  gui/SceneView.cpp
+  gui/Workspace.h
+  gui/Workspace.cpp)
 
 set_target_properties(mapgen_gui
   PROPERTIES
-    OUTPUT_NAME mapgen)
+    OUTPUT_NAME mapgen
+    AUTOMOC ON)
 
 target_link_libraries(mapgen_gui PRIVATE Qt5::Widgets NodeEditor::nodes mapgen)
 

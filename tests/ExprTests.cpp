@@ -1,7 +1,7 @@
 #include "ExprTests.h"
 
-#include "Backend.h"
-#include "IR.h"
+#include "core/Backend.h"
+#include "core/IR.h"
 
 #include <gtest/gtest.h>
 
@@ -28,7 +28,7 @@ public:
 
     backend.Resize(w, h);
 
-    backend.UpdateHeightMapExpr(*expr);
+    backend.UpdateHeightExpr(expr.get());
 
     backend.ComputeHeightMap();
 

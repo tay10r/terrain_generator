@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "Backend.h"
+#include "core/Backend.h"
+
 #include "ExprTests.h"
 
 TEST(CpuBackend, ExprTests)
