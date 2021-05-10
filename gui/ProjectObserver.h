@@ -19,4 +19,7 @@ public:
   virtual void ObserveHeightChange(const ir::Expr* heightExpr) = 0;
 
   virtual void ObserveSurfaceChange(const ir::Expr* colorExpr) = 0;
+
+  /// @brief Called whenever the terrain size is changed.
+  virtual void ObserveResolutionChange(size_t w, size_t h) = 0;
 };

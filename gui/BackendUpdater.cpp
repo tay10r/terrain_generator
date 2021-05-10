@@ -27,6 +27,13 @@ public:
     mBackend->ComputeSurface();
   }
 
+  void ObserveResolutionChange(size_t w, size_t h) override
+  {
+    mBackend->Resize(w, h);
+
+    mBackend->ComputeHeightMap();
+  }
+
 private:
   std::shared_ptr<Backend> mBackend;
 };

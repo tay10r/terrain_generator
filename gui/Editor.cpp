@@ -46,6 +46,12 @@ public:
       observer->ObserveHeightChange(heightExpr);
   }
 
+  void ObserveResolutionChange(size_t w, size_t h) override
+  {
+    for (auto& observer : mObservers)
+      observer->ObserveResolutionChange(w, h);
+  }
+
 private:
   std::vector<std::unique_ptr<Observer>> mObservers;
 };
