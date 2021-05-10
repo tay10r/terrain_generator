@@ -5,6 +5,7 @@
 namespace QtNodes {
 
 class NodeDataModel;
+class DataModelRegistry;
 
 } // namespace QtNodes
 

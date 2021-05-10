@@ -21,10 +21,6 @@ public:
 
   QString name() const override { return GetName(); }
 
-  QJsonObject save() const override { return QJsonObject(); }
-
-  void restore(const QJsonObject&) override {}
-
   unsigned int nPorts(QtNodes::PortType portType) const override
   {
     switch (portType) {
@@ -57,6 +53,20 @@ public:
     connect(mSpinBox,
             QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             [this](double) { OnDataChange(); });
+  }
+
+  QJsonObject save() const override
+  {
+    auto obj = NodeDataModel::save();
+
+    obj["value"] = mSpinBox->value();
+
+    return obj;
+  }
+
+  void restore(const QJsonObject& obj) override
+  {
+    mSpinBox->setValue(obj["value"].toDouble());
   }
 
   const char* GetName() const noexcept override { return "Float Constant"; }
@@ -92,6 +102,20 @@ public:
     connect(mSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), [this](int) {
       OnDataChange();
     });
+  }
+
+  QJsonObject save() const override
+  {
+    auto obj = NodeDataModel::save();
+
+    obj["value"] = mSpinBox->value();
+
+    return obj;
+  }
+
+  void restore(const QJsonObject& obj) override
+  {
+    mSpinBox->setValue(obj["value"].toInt());
   }
 
   const char* GetName() const noexcept override { return "Integer Constant"; }

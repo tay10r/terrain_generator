@@ -15,8 +15,6 @@ public:
 
   QString name() const override { return QStringLiteral("Coordinates"); }
 
-  void restore(const QJsonObject&) override {}
-
   unsigned int nPorts(QtNodes::PortType portType) const override
   {
     switch (portType) {

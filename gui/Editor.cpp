@@ -8,6 +8,7 @@
 
 #include <QCheckBox>
 #include <QFile>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QJsonDocument>
 #include <QSpinBox>
@@ -49,11 +50,13 @@ private:
   std::vector<std::unique_ptr<Observer>> mObservers;
 };
 
-class PropertiesEditor final
+class PropertiesEditor final : public QObject
 {
+  Q_OBJECT
 public:
   PropertiesEditor(QWidget* parent)
-    : mWidget(parent)
+    : QObject(parent)
+    , mWidget(parent)
     , mLayout(&mWidget)
     , mWidthBox(&mWidget)
     , mHeightBox(&mWidget)
@@ -72,6 +75,11 @@ public:
 
     mHeightBox.setMinimum(2);
     mHeightBox.setMaximum(32768);
+
+    connect(&mSizeLock,
+            &QCheckBox::stateChanged,
+            this,
+            &PropertiesEditor::OnSizeLockToggle);
   }
 
   QWidget* GetWidget() { return &mWidget; }
@@ -83,6 +91,27 @@ public:
     jsonObj["terrain_height"] = mHeightBox.value();
     jsonObj["terrain_size_lock"] = mSizeLock.isChecked();
     return jsonObj;
+  }
+
+  void FromJson(const QJsonObject& object)
+  {
+    mWidthBox.setValue(object["terrain_width"].toInt(1024));
+
+    mHeightBox.setValue(object["terrain_height"].toInt(1024));
+
+    mSizeLock.setChecked(object["terrain_size_lock"].toBool(false));
+  }
+
+private slots:
+  void OnSizeLockToggle(int state)
+  {
+    if (state == Qt::CheckState::Unchecked) {
+      mWidthBox.setEnabled(true);
+      mHeightBox.setEnabled(true);
+    } else {
+      mWidthBox.setEnabled(false);
+      mHeightBox.setEnabled(false);
+    }
   }
 
 private:
@@ -101,7 +130,8 @@ class HeightEditor final
 {
 public:
   HeightEditor(QWidget* parent, std::shared_ptr<ProjectObserver> observer)
-    : mDataModelRegistry(MakeDataModelRegistry())
+    : mProjectObserver(observer)
+    , mDataModelRegistry(MakeDataModelRegistry())
     , mFlowScene(mDataModelRegistry, parent)
     , mFlowView(&mFlowScene)
   {
@@ -110,12 +140,31 @@ public:
 
   QWidget* GetWidget() { return &mFlowView; }
 
-  QJsonObject ToJson() const
+  QJsonObject ToJson() const { return mFlowScene.saveToObject(); }
+
+  void FromJson(const QJsonObject& jsonObject)
   {
-    return mFlowScene.saveToObject();
+    mFlowScene.setRegistry(MakeDataModelRegistryWithHeight());
+
+    mFlowScene.loadFromObject(jsonObject);
+
+    mFlowScene.setRegistry(MakeDataModelRegistry());
   }
 
 private:
+  auto MakeDataModelRegistryWithHeight() -> std::shared_ptr<DataModelRegistry>
+  {
+    auto registry = MakeDataModelRegistry();
+
+    auto factory = [this]() -> std::unique_ptr<QtNodes::NodeDataModel> {
+      return MakeHeightModel(mProjectObserver);
+    };
+
+    registry->registerModel(factory, "Internal");
+
+    return registry;
+  }
+
   static auto MakeDataModelRegistry() -> std::shared_ptr<DataModelRegistry>
   {
     auto registry = std::make_shared<DataModelRegistry>();
@@ -128,6 +177,8 @@ private:
   }
 
 private:
+  std::shared_ptr<ProjectObserver> mProjectObserver;
+
   std::shared_ptr<DataModelRegistry> mDataModelRegistry;
 
   FlowScene mFlowScene;
@@ -139,7 +190,8 @@ class SurfaceEditor final
 {
 public:
   SurfaceEditor(QWidget* parent, std::shared_ptr<ProjectObserver> observer)
-    : mDataModelRegistry(MakeDataModelRegistry())
+    : mProjectObserver(observer)
+    , mDataModelRegistry(MakeDataModelRegistry())
     , mFlowScene(mDataModelRegistry, parent)
     , mFlowView(&mFlowScene)
   {
@@ -148,12 +200,31 @@ public:
 
   QWidget* GetWidget() { return &mFlowView; }
 
-  QJsonObject ToJson() const
+  QJsonObject ToJson() const { return mFlowScene.saveToObject(); }
+
+  void FromJson(const QJsonObject& jsonObject)
   {
-    return mFlowScene.saveToObject();
+    mFlowScene.setRegistry(MakeDataModelRegistryWithSurface());
+
+    mFlowScene.loadFromObject(jsonObject);
+
+    mFlowScene.setRegistry(MakeDataModelRegistry());
   }
 
 private:
+  auto MakeDataModelRegistryWithSurface() -> std::shared_ptr<DataModelRegistry>
+  {
+    auto registry = MakeDataModelRegistry();
+
+    auto factory = [this]() -> std::unique_ptr<QtNodes::NodeDataModel> {
+      return MakeSurfaceModel(mProjectObserver);
+    };
+
+    registry->registerModel(factory, "Internal");
+
+    return registry;
+  }
+
   static auto MakeDataModelRegistry() -> std::shared_ptr<DataModelRegistry>
   {
     auto registry = std::make_shared<DataModelRegistry>();
@@ -166,6 +237,8 @@ private:
   }
 
 private:
+  std::shared_ptr<ProjectObserver> mProjectObserver;
+
   std::shared_ptr<DataModelRegistry> mDataModelRegistry;
 
   FlowScene mFlowScene;
@@ -181,6 +254,23 @@ public:
   {}
 
   void ObserveSave() override { mEditor->Save(); }
+
+  void ObserveOpen() override
+  {
+    QFileDialog fileDialog(mEditor->GetWidget());
+
+    if (!fileDialog.exec())
+      return;
+
+    auto selectedFiles = fileDialog.selectedFiles();
+
+    if (selectedFiles.empty())
+      return;
+
+    auto file = selectedFiles[0].toStdString();
+
+    mEditor->Open(file.c_str());
+  }
 
 private:
   gui::Editor* mEditor;
@@ -240,6 +330,26 @@ public:
     return true;
   }
 
+  bool Open(const char* path) override
+  {
+    QFile file(path);
+
+    if (!file.open(QFile::ReadOnly | QFile::Text))
+      return false;
+
+    auto jsonDoc = QJsonDocument::fromJson(file.readAll());
+
+    auto rootObject = jsonDoc.object();
+
+    mHeightEditor.FromJson(rootObject["height"].toObject());
+
+    mSurfaceEditor.FromJson(rootObject["surface"].toObject());
+
+    mPropertiesEditor.FromJson(rootObject["properties"].toObject());
+
+    return true;
+  }
+
   auto MakeMenuBarObserver() -> std::unique_ptr<gui::MenuBarObserver> override
   {
     return std::unique_ptr<gui::MenuBarObserver>(new MenuBarProxy(this));
@@ -268,3 +378,5 @@ Editor::Make(QWidget* parent) -> std::unique_ptr<Editor>
 }
 
 } // namespace gui
+
+#include "Editor.moc"

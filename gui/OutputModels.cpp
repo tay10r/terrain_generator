@@ -14,13 +14,9 @@ public:
     : mObserver(observer)
   {}
 
-  QString caption() const override { return QStringLiteral("Output"); }
+  QString caption() const override { return QStringLiteral("Height"); }
 
-  QString name() const override { return QStringLiteral("Output"); }
-
-  QJsonObject save() const override { return QJsonObject(); }
-
-  void restore(const QJsonObject&) override {}
+  QString name() const override { return QStringLiteral("Height"); }
 
   unsigned int nPorts(QtNodes::PortType portType) const override
   {
@@ -93,10 +89,6 @@ public:
   QString caption() const override { return QStringLiteral("Surface"); }
 
   QString name() const override { return QStringLiteral("Surface"); }
-
-  QJsonObject save() const override { return QJsonObject(); }
-
-  void restore(const QJsonObject&) override {}
 
   unsigned int nPorts(QtNodes::PortType portType) const override
   {

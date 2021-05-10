@@ -22,6 +22,8 @@ public:
 
   virtual QWidget* GetWidget() = 0;
 
+  virtual bool Open(const char* path) = 0;
+
   virtual bool Save() const = 0;
 
   virtual bool Save(const char* path) const = 0;

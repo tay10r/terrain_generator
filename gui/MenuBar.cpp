@@ -2,7 +2,6 @@
 
 #include "MenuBarObserver.h"
 
-//#include <QFileDialog>
 #include <QMenuBar>
 
 namespace {
@@ -23,15 +22,12 @@ public slots:
   {
     for (auto& observer : mObservers)
       observer->ObserveSave();
-#if 0
-    QFileDialog dialog(nullptr, tr("Save Project"));
+  }
 
-    dialog.setAcceptMode(QFileDialog::AcceptSave);
-
-    dialog.setNameFilter("*.json");
-
-    dialog.exec();
-#endif
+  void OnOpen()
+  {
+    for (auto& observer : mObservers)
+      observer->ObserveOpen();
   }
 
 private:
@@ -63,8 +59,15 @@ private:
     saveAction->setShortcuts(QKeySequence::Save);
     saveAction->setStatusTip(QObject::tr("Save the project changes to file."));
 
+    auto* openAction = fileMenu->addAction(QObject::tr("Open"));
+    openAction->setShortcuts(QKeySequence::Open);
+    openAction->setStatusTip(QObject::tr("Open an existing project."));
+
     QObject::connect(
       saveAction, &QAction::triggered, &mSignalProxy, &SignalProxy::OnSave);
+
+    QObject::connect(
+      openAction, &QAction::triggered, &mSignalProxy, &SignalProxy::OnOpen);
   }
 
 private:
