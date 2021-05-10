@@ -7,6 +7,7 @@
 #include <iostream>
 #include <vector>
 
+#include <math.h>
 #include <stdint.h>
 
 namespace {
@@ -53,6 +54,89 @@ public:
   float Eval(const BuiltinVars& builtinVars) const noexcept override
   {
     return builtinVars.v;
+  }
+};
+
+class UnaryFloatExpr : public FloatExpr
+{
+public:
+  UnaryFloatExpr(std::unique_ptr<FloatExpr> innerExpr)
+    : mInnerExpr(std::move(innerExpr))
+  {}
+
+protected:
+  float InnerEval(const BuiltinVars& builtins) const noexcept
+  {
+    return mInnerExpr->Eval(builtins);
+  }
+
+private:
+  std::unique_ptr<FloatExpr> mInnerExpr;
+};
+
+class SineExpr final : public UnaryFloatExpr
+{
+public:
+  using UnaryFloatExpr::UnaryFloatExpr;
+
+  float Eval(const BuiltinVars& builtins) const noexcept override
+  {
+    return sin(InnerEval(builtins));
+  }
+};
+
+class CosineExpr final : public UnaryFloatExpr
+{
+public:
+  using UnaryFloatExpr::UnaryFloatExpr;
+
+  float Eval(const BuiltinVars& builtins) const noexcept override
+  {
+    return cos(InnerEval(builtins));
+  }
+};
+
+class TangentExpr final : public UnaryFloatExpr
+{
+public:
+  using UnaryFloatExpr::UnaryFloatExpr;
+
+  float Eval(const BuiltinVars& builtins) const noexcept override
+  {
+    return tan(InnerEval(builtins));
+  }
+};
+
+class ArcsineExpr final : public UnaryFloatExpr
+{
+public:
+  using UnaryFloatExpr::UnaryFloatExpr;
+
+  float Eval(const BuiltinVars& builtins) const noexcept override
+  {
+    return asin(InnerEval(builtins));
+  }
+};
+
+class ArccosineExpr final : public UnaryFloatExpr
+{
+public:
+  using UnaryFloatExpr::UnaryFloatExpr;
+
+  float Eval(const BuiltinVars& builtins) const noexcept override
+  {
+    return acos(InnerEval(builtins));
+  }
+};
+
+class ArctangentExpr final : public UnaryFloatExpr
+{
+public:
+  using UnaryFloatExpr::UnaryFloatExpr;
+
+  float Eval(const BuiltinVars& builtins) const noexcept override
+  {
+    return atan(InnerEval(builtins));
   }
 };
 
@@ -127,6 +211,8 @@ public:
 
   void Visit(const ir::FloatToIntExpr& floatToInt) override;
 
+  void Visit(const ir::UnaryTrigExpr&) override {}
+
 private:
   std::unique_ptr<IntExpr> mExpr;
 };
@@ -168,6 +254,39 @@ public:
       return;
 
     mFloatExpr.reset(new IntToFloatExpr(std::move(intExpr)));
+  }
+
+  void Visit(const ir::UnaryTrigExpr& trigExpr) override
+  {
+    FloatExprBuilder subBuilder;
+
+    trigExpr.GetInputExpr().Accept(subBuilder);
+
+    auto operand = subBuilder.TakeResult();
+
+    if (!operand)
+      return;
+
+    switch (trigExpr.GetID()) {
+      case ir::UnaryTrigExpr::ID::Sine:
+        mFloatExpr.reset(new SineExpr(std::move(operand)));
+        break;
+      case ir::UnaryTrigExpr::ID::Cosine:
+        mFloatExpr.reset(new CosineExpr(std::move(operand)));
+        break;
+      case ir::UnaryTrigExpr::ID::Tangent:
+        mFloatExpr.reset(new TangentExpr(std::move(operand)));
+        break;
+      case ir::UnaryTrigExpr::ID::Arcsine:
+        mFloatExpr.reset(new ArcsineExpr(std::move(operand)));
+        break;
+      case ir::UnaryTrigExpr::ID::Arccosine:
+        mFloatExpr.reset(new ArccosineExpr(std::move(operand)));
+        break;
+      case ir::UnaryTrigExpr::ID::Arctangent:
+        mFloatExpr.reset(new ArctangentExpr(std::move(operand)));
+        break;
+    }
   }
 
   void Visit(const ir::IntLiteralExpr&) override {}

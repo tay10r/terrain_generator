@@ -52,6 +52,8 @@ add_executable(mapgen_gui
   gui/OutputModels.cpp
   gui/SceneView.h
   gui/SceneView.cpp
+  gui/TrigModels.h
+  gui/TrigModels.cpp
   gui/Workspace.h
   gui/Workspace.cpp)
 

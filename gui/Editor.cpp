@@ -5,6 +5,7 @@
 #include "gui/MenuBarObserver.h"
 #include "gui/OutputModels.h"
 #include "gui/ProjectObserver.h"
+#include "gui/TrigModels.h"
 
 #include <QCheckBox>
 #include <QFile>
@@ -179,6 +180,8 @@ private:
 
     DefineCoordinatesModel(*registry);
 
+    DefineTrigModels(*registry);
+
     return registry;
   }
 
@@ -238,6 +241,8 @@ private:
     DefineConstantsModels(*registry);
 
     DefineCoordinatesModel(*registry);
+
+    DefineTrigModels(*registry);
 
     return registry;
   }

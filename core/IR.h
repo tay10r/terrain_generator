@@ -21,6 +21,7 @@ enum class Type
 class VarRefExpr;
 class IntToFloatExpr;
 class FloatToIntExpr;
+class UnaryTrigExpr;
 
 template<typename ValueType>
 class LiteralExpr;
@@ -43,6 +44,8 @@ public:
   virtual void Visit(const FloatToIntExpr&) = 0;
 
   virtual void Visit(const IntToFloatExpr&) = 0;
+
+  virtual void Visit(const UnaryTrigExpr&) = 0;
 };
 
 class Expr
@@ -142,6 +145,38 @@ public:
   void Accept(ExprVisitor& visitor) const override;
 
   auto GetType() const noexcept -> std::optional<Type> override;
+};
+
+class UnaryTrigExpr final : public Expr
+{
+public:
+  enum class ID
+  {
+    Sine,
+    Cosine,
+    Tangent,
+    Arcsine,
+    Arccosine,
+    Arctangent
+  };
+
+  UnaryTrigExpr(ID id, const Expr& inputExpr)
+    : mID(id)
+    , mInputExpr(inputExpr)
+  {}
+
+  void Accept(ExprVisitor& visitor) const override { visitor.Visit(*this); }
+
+  auto GetType() const noexcept -> std::optional<Type> { return Type::Float; }
+
+  auto GetID() const noexcept { return mID; }
+
+  auto GetInputExpr() const noexcept -> const Expr& { return mInputExpr; }
+
+private:
+  ID mID;
+
+  const Expr& mInputExpr;
 };
 
 } // namespace ir
