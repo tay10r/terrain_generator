@@ -82,6 +82,8 @@ public:
                  QtNodes::PortIndex) override
   {
     mInputNodeData = nodeData;
+
+    emit dataUpdated(0);
   }
 
   auto embeddedWidget() -> QWidget* override { return nullptr; }

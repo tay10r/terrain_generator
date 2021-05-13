@@ -34,28 +34,33 @@ target_compile_features(mapgen PUBLIC cxx_std_17)
 
 target_link_libraries(mapgen PUBLIC glm OpenGL::OpenGL)
 
-add_executable(mapgen_gui
-  main.cpp
-  gui/BackendUpdater.h
-  gui/BackendUpdater.cpp
+set(node_data_models
+  gui/ArithModels.h
+  gui/ArithModels.cpp
   gui/CoordinatesModel.h
   gui/CoordinatesModel.cpp
   gui/ConstantsModels.h
   gui/ConstantsModels.cpp
+  gui/OutputModels.h
+  gui/OutputModels.cpp
+  gui/TrigModels.h
+  gui/TrigModels.cpp)
+
+add_executable(mapgen_gui
+  main.cpp
+  gui/BackendUpdater.h
+  gui/BackendUpdater.cpp
   gui/ExprNodeData.h
   gui/ExprNodeData.cpp
   gui/Editor.h
   gui/Editor.cpp
   gui/MenuBar.h
   gui/MenuBar.cpp
-  gui/OutputModels.h
-  gui/OutputModels.cpp
   gui/SceneView.h
   gui/SceneView.cpp
-  gui/TrigModels.h
-  gui/TrigModels.cpp
   gui/Workspace.h
-  gui/Workspace.cpp)
+  gui/Workspace.cpp
+  ${node_data_models})
 
 set_target_properties(mapgen_gui
   PROPERTIES

@@ -405,6 +405,8 @@ private:
     auto w = mHeightMapUpdate->w;
     auto h = mHeightMapUpdate->h;
 
+    mShader->UpdateBufferSize(w, h);
+
     mShader->UpdateHeightMap(data, w, h);
   }
 

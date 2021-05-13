@@ -26,6 +26,77 @@ public:
   virtual float Eval(const BuiltinVars&) const noexcept = 0;
 };
 
+class BinaryFloatExpr : public FloatExpr
+{
+public:
+  BinaryFloatExpr(std::unique_ptr<FloatExpr> l, std::unique_ptr<FloatExpr> r)
+    : mLeft(std::move(l))
+    , mRight(std::move(r))
+  {}
+
+  virtual ~BinaryFloatExpr() = default;
+
+protected:
+  float EvalLeft(const BuiltinVars& builtins) const noexcept
+  {
+    return mLeft->Eval(builtins);
+  }
+
+  float EvalRight(const BuiltinVars& builtins) const noexcept
+  {
+    return mRight->Eval(builtins);
+  }
+
+private:
+  std::unique_ptr<FloatExpr> mLeft;
+
+  std::unique_ptr<FloatExpr> mRight;
+};
+
+class AddFloatExpr final : public BinaryFloatExpr
+{
+public:
+  using BinaryFloatExpr::BinaryFloatExpr;
+
+  float Eval(const BuiltinVars& builtins) const noexcept override
+  {
+    return EvalLeft(builtins) + EvalRight(builtins);
+  }
+};
+
+class SubFloatExpr final : public BinaryFloatExpr
+{
+public:
+  using BinaryFloatExpr::BinaryFloatExpr;
+
+  float Eval(const BuiltinVars& builtins) const noexcept override
+  {
+    return EvalLeft(builtins) - EvalRight(builtins);
+  }
+};
+
+class MulFloatExpr final : public BinaryFloatExpr
+{
+public:
+  using BinaryFloatExpr::BinaryFloatExpr;
+
+  float Eval(const BuiltinVars& builtins) const noexcept override
+  {
+    return EvalLeft(builtins) * EvalRight(builtins);
+  }
+};
+
+class DivFloatExpr final : public BinaryFloatExpr
+{
+public:
+  using BinaryFloatExpr::BinaryFloatExpr;
+
+  float Eval(const BuiltinVars& builtins) const noexcept override
+  {
+    return EvalLeft(builtins) / EvalRight(builtins);
+  }
+};
+
 class FloatLiteral final : public FloatExpr
 {
 public:
@@ -213,6 +284,12 @@ public:
 
   void Visit(const ir::UnaryTrigExpr&) override {}
 
+  void Visit(const ir::BinaryExpr& binaryExpr) override
+  {
+    // TODO
+    (void)binaryExpr;
+  }
+
 private:
   std::unique_ptr<IntExpr> mExpr;
 };
@@ -292,6 +369,40 @@ public:
   void Visit(const ir::IntLiteralExpr&) override {}
 
   void Visit(const ir::FloatToIntExpr&) override {}
+
+  void Visit(const ir::BinaryExpr& binaryExpr) override
+  {
+    auto lExpr = BuildSubExpr(binaryExpr.GetLeftExpr());
+    auto rExpr = BuildSubExpr(binaryExpr.GetRightExpr());
+
+    if (!lExpr || !rExpr)
+      return;
+
+    switch (binaryExpr.GetID()) {
+      case ir::BinaryExpr::ID::Add:
+        mFloatExpr.reset(new AddFloatExpr(std::move(lExpr), std::move(rExpr)));
+        break;
+      case ir::BinaryExpr::ID::Sub:
+        mFloatExpr.reset(new SubFloatExpr(std::move(lExpr), std::move(rExpr)));
+        break;
+      case ir::BinaryExpr::ID::Mul:
+        mFloatExpr.reset(new MulFloatExpr(std::move(lExpr), std::move(rExpr)));
+        break;
+      case ir::BinaryExpr::ID::Div:
+        mFloatExpr.reset(new DivFloatExpr(std::move(lExpr), std::move(rExpr)));
+        break;
+    }
+  }
+
+private:
+  static auto BuildSubExpr(const ir::Expr& expr) -> std::unique_ptr<FloatExpr>
+  {
+    FloatExprBuilder builder;
+
+    expr.Accept(builder);
+
+    return builder.TakeResult();
+  }
 
 private:
   std::unique_ptr<FloatExpr> mFloatExpr;

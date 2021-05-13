@@ -64,4 +64,22 @@ FloatToIntExpr::Accept(ExprVisitor& visitor) const
   visitor.Visit(*this);
 }
 
+auto
+BinaryExpr::GetType() const noexcept -> std::optional<Type>
+{
+  auto lType = mLeft.GetType();
+
+  auto rType = mRight.GetType();
+
+  if (!lType || !rType)
+    return {};
+
+  if (lType == rType)
+    return *lType;
+
+  // TODO : handle vector and matrix types
+
+  return {};
+}
+
 } // namespace ir

@@ -1,5 +1,6 @@
 #include "gui/Editor.h"
 
+#include "gui/ArithModels.h"
 #include "gui/ConstantsModels.h"
 #include "gui/CoordinatesModel.h"
 #include "gui/MenuBarObserver.h"
@@ -61,13 +62,15 @@ class PropertiesEditor final : public QObject
 {
   Q_OBJECT
 public:
-  PropertiesEditor(QWidget* parent)
+  PropertiesEditor(QWidget* parent,
+                   std::shared_ptr<ProjectObserver> projectObserver)
     : QObject(parent)
     , mWidget(parent)
     , mLayout(&mWidget)
     , mWidthBox(&mWidget)
     , mHeightBox(&mWidget)
     , mSizeLock(&mWidget)
+    , mProjectObserver(projectObserver)
   {
     mLayout.addRow("Width", &mWidthBox);
 
@@ -87,6 +90,16 @@ public:
             &QCheckBox::stateChanged,
             this,
             &PropertiesEditor::OnSizeLockToggle);
+
+    connect(&mWidthBox,
+            QOverload<int>::of(&QSpinBox::valueChanged),
+            this,
+            &PropertiesEditor::OnSizeChange);
+
+    connect(&mHeightBox,
+            QOverload<int>::of(&QSpinBox::valueChanged),
+            this,
+            &PropertiesEditor::OnSizeChange);
   }
 
   QWidget* GetWidget() { return &mWidget; }
@@ -121,6 +134,15 @@ private slots:
     }
   }
 
+  void OnSizeChange(int)
+  {
+    auto w = size_t(mWidthBox.value());
+
+    auto h = size_t(mHeightBox.value());
+
+    mProjectObserver->ObserveResolutionChange(w, h);
+  }
+
 private:
   QWidget mWidget;
 
@@ -131,6 +153,8 @@ private:
   QSpinBox mHeightBox;
 
   QCheckBox mSizeLock;
+
+  std::shared_ptr<ProjectObserver> mProjectObserver;
 };
 
 class HeightEditor final
@@ -181,6 +205,8 @@ private:
     DefineCoordinatesModel(*registry);
 
     DefineTrigModels(*registry);
+
+    DefineArithModels(*registry);
 
     return registry;
   }
@@ -244,6 +270,8 @@ private:
 
     DefineTrigModels(*registry);
 
+    DefineArithModels(*registry);
+
     return registry;
   }
 
@@ -295,7 +323,7 @@ public:
     , mCompoundObserver(new CompoundProjectObserver())
     , mHeightEditor(&mTabWidget, mCompoundObserver)
     , mSurfaceEditor(&mTabWidget, mCompoundObserver)
-    , mPropertiesEditor(&mTabWidget)
+    , mPropertiesEditor(&mTabWidget, mCompoundObserver)
   {
     mTabWidget.setMinimumSize(320, 240);
 

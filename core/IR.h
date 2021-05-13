@@ -22,6 +22,7 @@ class VarRefExpr;
 class IntToFloatExpr;
 class FloatToIntExpr;
 class UnaryTrigExpr;
+class BinaryExpr;
 
 template<typename ValueType>
 class LiteralExpr;
@@ -46,6 +47,8 @@ public:
   virtual void Visit(const IntToFloatExpr&) = 0;
 
   virtual void Visit(const UnaryTrigExpr&) = 0;
+
+  virtual void Visit(const BinaryExpr&) = 0;
 };
 
 class Expr
@@ -167,7 +170,10 @@ public:
 
   void Accept(ExprVisitor& visitor) const override { visitor.Visit(*this); }
 
-  auto GetType() const noexcept -> std::optional<Type> { return Type::Float; }
+  auto GetType() const noexcept -> std::optional<Type> override
+  {
+    return Type::Float;
+  }
 
   auto GetID() const noexcept { return mID; }
 
@@ -177,6 +183,41 @@ private:
   ID mID;
 
   const Expr& mInputExpr;
+};
+
+class BinaryExpr final : public Expr
+{
+public:
+  enum class ID
+  {
+    Add,
+    Sub,
+    Mul,
+    Div
+  };
+
+  BinaryExpr(ID id, const Expr& left, const Expr& right)
+    : mID(id)
+    , mLeft(left)
+    , mRight(right)
+  {}
+
+  void Accept(ExprVisitor& visitor) const override { visitor.Visit(*this); }
+
+  auto GetID() const noexcept -> ID { return mID; }
+
+  auto GetLeftExpr() const noexcept -> const Expr& { return mLeft; }
+
+  auto GetRightExpr() const noexcept -> const Expr& { return mRight; }
+
+  auto GetType() const noexcept -> std::optional<Type> override;
+
+private:
+  ID mID;
+
+  const Expr& mLeft;
+
+  const Expr& mRight;
 };
 
 } // namespace ir
