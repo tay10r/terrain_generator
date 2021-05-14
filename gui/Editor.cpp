@@ -177,6 +177,8 @@ public:
   {
     mFlowScene.setRegistry(MakeDataModelRegistryWithHeight());
 
+    mFlowScene.clearScene();
+
     mFlowScene.loadFromObject(jsonObject);
 
     mFlowScene.setRegistry(MakeDataModelRegistry());
