@@ -1,0 +1,13 @@
+#include "shaders.h"
+
+namespace terra {
+
+const char* gVertSource = R"(
+@vertShader@
+)";
+
+const char* gFragSource = R"(
+@fragShader@
+)";
+
+} // namespace terra
